@@ -55,7 +55,13 @@ public class Robot extends TimedRobot {
     if (arduino != null) {
       double batteryCharge = (pdp.getVoltage() - 10.5)/2.2;
       int batteryLights = (int) (batteryCharge * 20);
-      int battColor = Math.min(85, (int) ((batteryCharge + 0.4) * 85));
+      int battColor;
+
+      if(batteryCharge >= 0.5) {
+        battColor = Math.min(85, (int) ((batteryCharge+0.4)*85));
+      } else {
+        battColor = (int)(120*batteryCharge);
+      }
 
       arduino.writeString(String.format("s%d %d", batteryLights, battColor));
     }
@@ -65,6 +71,14 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     // Use the joystick X axis for lateral movement, Y axis for forward
     // movement, and Z axis for rotation.
-    m_robotDrive.driveCartesian (.5*Math.pow(m_stick.getX(), 3), .5*-Math.pow(m_stick.getY(), 3), .5*Math.pow(m_stick.getZ(), 3), 0.0);
+    if(m_stick.getTrigger()) {
+      m_robotDrive.driveCartesian (0.75*Math.pow(m_stick.getX(), 3), 0.75*-Math.pow(m_stick.getY(), 3), 0.75*Math.pow(m_stick.getZ(), 3), 0.0);
+      arduino.writeString("U");
+    } else { 
+      m_robotDrive.driveCartesian (.5*Math.pow(m_stick.getX(), 3), .5*-Math.pow(m_stick.getY(), 3), .5*Math.pow(m_stick.getZ(), 3), 0.0);
+      arduino.writeString("u");
+    }
+
+
   }
 }
