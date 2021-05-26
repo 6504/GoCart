@@ -9,6 +9,7 @@ import edu.wpi.first.wpilibj.PWMSparkMax;
 import edu.wpi.first.wpilibj.PowerDistributionPanel;
 import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 
 /** This is a demo program showing how to use Mecanum control with the RobotDrive class. */
@@ -24,6 +25,11 @@ public class Robot extends TimedRobot {
   private Joystick m_stick;
   private SerialPort arduino = null;
   private PowerDistributionPanel pdp = new PowerDistributionPanel();
+
+  private double curPowerMultiplier = 0.5;
+
+  private double lastVoltageUpdateTime = Timer.getFPGATimestamp();
+  private double lastUnderglowUpdateTime = Timer.getFPGATimestamp();
 
   @Override
   public void robotInit() {
@@ -52,7 +58,7 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotPeriodic() {
-    if (arduino != null) {
+    if (arduino != null && (Timer.getFPGATimestamp() - lastVoltageUpdateTime) > 1) {
       double batteryCharge = (pdp.getVoltage() - 10.5)/2.2;
       int batteryLights = (int) (batteryCharge * 20);
       int battColor;
@@ -64,6 +70,7 @@ public class Robot extends TimedRobot {
       }
 
       arduino.writeString(String.format("s%d %d", batteryLights, battColor));
+      lastVoltageUpdateTime = Timer.getFPGATimestamp();
     }
   }
 
@@ -71,13 +78,36 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     // Use the joystick X axis for lateral movement, Y axis for forward
     // movement, and Z axis for rotation.
-    if(m_stick.getTrigger()) {
-      m_robotDrive.driveCartesian (0.75*Math.pow(m_stick.getX(), 3), 0.75*-Math.pow(m_stick.getY(), 3), 0.75*Math.pow(m_stick.getZ(), 3), 0.0);
+
+    double prevPowerMultiplier = curPowerMultiplier;
+
+    if (m_stick.getTrigger()) {
+      if (m_stick.getPOV() >= 0) {
+        curPowerMultiplier = 1;
+      } else {
+        curPowerMultiplier = 0.75;
+      }
+      /*if ((Timer.getFPGATimestamp() - lastUnderglowUpdateTime) > 1) {
+        arduino.writeString("U");
+        lastUnderglowUpdateTime = Timer.getFPGATimestamp();
+      }*/
+    } else {
+      curPowerMultiplier = 0.5;
+      /*if ((Timer.getFPGATimestamp() - lastUnderglowUpdateTime) > 1) {
+        arduino.writeString("u");
+        lastUnderglowUpdateTime = Timer.getFPGATimestamp();
+      }*/
+    }
+
+    if (curPowerMultiplier > prevPowerMultiplier) {
+
       arduino.writeString("U");
-    } else { 
-      m_robotDrive.driveCartesian (.5*Math.pow(m_stick.getX(), 3), .5*-Math.pow(m_stick.getY(), 3), .5*Math.pow(m_stick.getZ(), 3), 0.0);
+    } else if (curPowerMultiplier < prevPowerMultiplier) {
       arduino.writeString("u");
     }
+
+    m_robotDrive.driveCartesian (curPowerMultiplier*Math.pow(m_stick.getX(), 3), curPowerMultiplier*-Math.pow(m_stick.getY(), 3), curPowerMultiplier*Math.pow(m_stick.getZ(), 3), 0.0);
+    
 
 
   }
